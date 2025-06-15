@@ -6,7 +6,7 @@ const userRouter = express.Router();
 const followController = require('../controllers/follow');
 const { authenticateToken } = require('../middleware/authMiddleware');
 
-// Bu rota, /api/v1/users/:username/profile şeklinde bir adrese gelen istekleri karşılayacak.
+// Bu rota, /users/:username/profile şeklinde bir adrese gelen istekleri karşılayacak.
 userRouter.get('/:username/profile', authenticateToken, followController.getUserProfileByUsername);
 
 module.exports = userRouter;

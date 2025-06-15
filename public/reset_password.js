@@ -201,7 +201,7 @@
             }
 
             try {
-                const apiUrl = `${CONFIG.API_BASE_URL}/api/v1/auth/validate-reset-token?token=${encodeURIComponent(token)}`;
+                const apiUrl = `${CONFIG.API_BASE_URL}/auth/validate-reset-token?token=${encodeURIComponent(token)}`;
                 const result = await makeApiRequest(apiUrl);
 
                 if (!result.basarili) {
@@ -257,7 +257,7 @@
             }
 
             try {
-                const apiUrl = `${CONFIG.API_BASE_URL}/api/v1/auth/reset-password?token=${encodeURIComponent(currentToken)}`;
+                const apiUrl = `${CONFIG.API_BASE_URL}/auth/reset-password?token=${encodeURIComponent(currentToken)}`;
                 const result = await makeApiRequest(apiUrl, {
                     method: 'POST',
                     body: JSON.stringify({ password, confirmPassword })

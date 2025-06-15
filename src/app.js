@@ -83,7 +83,7 @@ app.use(express.static(publicPath));
 console.log(`✅ Statik dosyalar şu dizinden sunulacak: ${publicPath}`);
 
 // --- API ROTALARI ---
-// Tüm rotalarımızı /api/v1 altında merkezi olarak kullanıyoruz.
+// Tüm rotalarımızı  altında merkezi olarak kullanıyoruz.
 app.use('/', mainRouter);
 
 // --- Swagger ---

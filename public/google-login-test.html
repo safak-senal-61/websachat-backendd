@@ -119,7 +119,7 @@
 
     <script>
         // Backend API'nizin tam base URL'si (örn: https://sunucunuz.com)
-        // Bu, /api/v1/auth/google gibi endpointlere yönlendirme yapmak için kullanılacak.
+        // Bu, /auth/google gibi endpointlere yönlendirme yapmak için kullanılacak.
         const BACKEND_BASE_URL = "https://3000-firebase-websachat-backend-1748272624869.cluster-6vyo4gb53jczovun3dxslzjahs.cloudworkstations.dev";
 
         const googleLoginButton = document.getElementById('googleLoginButton');
@@ -134,7 +134,7 @@
         googleLoginButton.addEventListener('click', function(event) {
             event.preventDefault();
             // Backend'deki Google OAuth başlatma endpoint'ine yönlendir
-            window.location.href = `${BACKEND_BASE_URL}/api/v1/auth/google`;
+            window.location.href = `${BACKEND_BASE_URL}/auth/google`;
         });
 
         // Sayfa yüklendiğinde URL'deki parametreleri kontrol et (OAuth callback'inden gelmiş olabilir)

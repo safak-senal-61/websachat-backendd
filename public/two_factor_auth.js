@@ -1,5 +1,5 @@
 
-    const API_BASE_URL = "https://3000-firebase-websachat-backend-1748272624869.cluster-6vyo4gb53jczovun3dxslzjahs.cloudworkstations.dev/api/v1";
+    const API_BASE_URL = "https://3000-firebase-websachat-backend-1748272624869.cluster-6vyo4gb53jczovun3dxslzjahs.cloudworkstations.dev";
     const twoFAStatusEl = document.getElementById('2faStatus');
     const btnToggle2FA = document.getElementById('btnToggle2FA');
     

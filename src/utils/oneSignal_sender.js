@@ -29,7 +29,7 @@ const sendPushNotification = async (notificationData) => {
     const options = {
         host: "onesignal.com",
         port: 443,
-        path: "/api/v1/notifications",
+        path: "/notifications",
         method: "POST",
         headers: headers
     };
