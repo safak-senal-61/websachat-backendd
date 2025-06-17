@@ -9,7 +9,7 @@ const { sanitizeUser } = require('../auth/utils');
 
 const EMAIL_CHANGE_SECRET = process.env.EMAIL_CHANGE_VERIFICATION_SECRET || 'your-email-change-secret';
 const EMAIL_CHANGE_EXPIRES_IN = process.env.EMAIL_CHANGE_VERIFICATION_EXPIRES_IN || '1h';
-const APP_BASE_URL = process.env.CLIENT_URL || 'http://localhost:3001';
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3001';
 
 /**
  * Kullanıcının mevcut şifresini doğrular ve yeni bir şifre belirler.
@@ -63,8 +63,8 @@ exports.requestEmailChange = async (req, res) => {
 
         const tokenPayload = { userId, newEmail, type: 'email_change_verification' };
         const verificationToken = jwt.sign(tokenPayload, EMAIL_CHANGE_SECRET, { expiresIn: EMAIL_CHANGE_EXPIRES_IN });
-        const verificationLink = `${APP_BASE_URL}/verify-email-change?token=${verificationToken}`;
-
+        // DÜZELTME: Link artık Next.js uygulamasını işaret ediyor.
+        const verificationLink = `${CLIENT_URL}/verify-email-change?token=${verificationToken}`;
         await sendEmail(newEmail, 'E-posta Adresi Değişikliği Doğrulaması', `<p>Bu değişikliği onaylamak için linke tıklayın: <a href="${verificationLink}">Doğrula</a></p>`);
 
         return Response.ok(res, `Doğrulama linki yeni e-posta adresinize (${newEmail}) gönderildi.`);

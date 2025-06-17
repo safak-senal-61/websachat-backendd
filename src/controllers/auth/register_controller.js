@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 const Response = require('../../utils/responseHandler');
 const { sendWelcomeAndActivationEmail } = require('../../utils/mailer');
 const { generateEmailVerificationToken } = require('./utils');
-const { APP_BASE_URL, ADMIN_SECRET, WIP_SECRET } = require('./constants');
+const { CLIENT_URL, ADMIN_SECRET, WIP_SECRET } = require('./constants');
 
 /**
  * Standart kullanıcı kaydı.
@@ -46,7 +46,8 @@ const register = async (req, res) => {
     });
 
     const verificationToken = generateEmailVerificationToken(newUser.id, newUser.email);
-    const verificationLink = `${APP_BASE_URL}/verify-email.html?token=${verificationToken}`;
+
+    const verificationLink = `${CLIENT_URL}/verify-email?token=${verificationToken}`;
     await sendWelcomeAndActivationEmail(newUser.email, newUser.nickname || newUser.username, verificationLink);
 
     return Response.created(res, 'Kayıt başarılı. Hesabınızı aktive etmek için e-postanızı kontrol edin.', {

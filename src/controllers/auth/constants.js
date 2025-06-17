@@ -22,8 +22,8 @@ const EMAIL_VERIFICATION_EXPIRES_IN = process.env.EMAIL_VERIFICATION_EXPIRES_IN 
 const PASSWORD_RESET_SECRET = process.env.PASSWORD_RESET_SECRET || 'your-password-reset-secret';
 const PASSWORD_RESET_EXPIRES_IN = process.env.PASSWORD_RESET_EXPIRES_IN || '1h';
 
-// Uygulama URL'si
-const APP_BASE_URL = process.env.BASE_URL || process.env.CLIENT_URL || 'http://localhost:3001';
+// Frontend Uygulama URL'si (E-posta linkleri için)
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3001';
 
 // Cookie Ayarları
 const ACCESS_TOKEN_COOKIE_NAME = 'accessToken';
@@ -41,7 +41,7 @@ module.exports = {
   EMAIL_VERIFICATION_EXPIRES_IN,
   PASSWORD_RESET_SECRET,
   PASSWORD_RESET_EXPIRES_IN,
-  APP_BASE_URL,
+  CLIENT_URL, // APP_BASE_URL yerine bunu kullanacağız
   ACCESS_TOKEN_COOKIE_NAME,
   REFRESH_TOKEN_COOKIE_NAME,
   GLOBAL_COOKIE_PATH,

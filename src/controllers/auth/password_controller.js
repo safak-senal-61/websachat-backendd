@@ -1,4 +1,4 @@
-// src/controllers/auth/password.controller.js
+// src/controllers/auth/password_controller.js
 
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 const Response = require('../../utils/responseHandler');
 const { sendPasswordResetEmail } = require('../../utils/mailer');
 const { generatePasswordResetToken } = require('./utils');
-const { PASSWORD_RESET_SECRET, APP_BASE_URL } = require('./constants');
+const { PASSWORD_RESET_SECRET, CLIENT_URL } = require('./constants'); // APP_BASE_URL -> CLIENT_URL
 
 /**
  * Şifre sıfırlama talebi oluşturur ve e-posta gönderir.
@@ -20,7 +20,8 @@ const forgotPassword = async (req, res) => {
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     if (user) {
       const resetToken = generatePasswordResetToken(user.id, user.email);
-      const resetLink = `${APP_BASE_URL}/reset-password?token=${resetToken}`;
+      // DÜZELTME: Link artık Next.js uygulamanızı işaret ediyor.
+      const resetLink = `${CLIENT_URL}/reset-password?token=${resetToken}`;
       await sendPasswordResetEmail(user.email, user.nickname || user.username, resetLink);
     }
     return Response.ok(res, 'Eğer e-posta kayıtlıysa, şifre sıfırlama linki gönderilmiştir.');
@@ -77,7 +78,6 @@ const resetPassword = async (req, res) => {
 
     return Response.ok(res, 'Şifreniz güncellendi. Yeni şifrenizle giriş yapabilirsiniz.');
   } catch (error) {
-    // Error handling as in validatePasswordResetToken
     if (error instanceof jwt.TokenExpiredError) return Response.unauthorized(res, 'Token süresi dolmuş.');
     if (error instanceof jwt.JsonWebTokenError) return Response.badRequest(res, 'Token geçersiz.');
     console.error('Şifre sıfırlama hatası:', error);

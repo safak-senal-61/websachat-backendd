@@ -89,7 +89,13 @@ const generateTokens = async (user, res) => {
 
   console.log(`[AuthUtils] Token cookies set for user ${user.id}`);
 
-  return { accessToken, accessExpiresIn: JWT_EXPIRES_IN };
+  return {
+    accessToken,
+    accessExpiresIn: JWT_EXPIRES_IN,
+    refreshToken,
+    refreshExpiresIn: JWT_REFRESH_EXPIRES_IN,
+  };
+
 };
 
 /**

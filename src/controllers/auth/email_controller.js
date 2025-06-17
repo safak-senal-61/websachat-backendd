@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 const Response = require('../../utils/responseHandler');
 const { sendAccountActivationEmail } = require('../../utils/mailer');
 const { generateEmailVerificationToken } = require('./utils');
-const { EMAIL_VERIFICATION_SECRET, APP_BASE_URL } = require('./constants');
+const { EMAIL_VERIFICATION_SECRET, CLIENT_URL } = require('./constants');
 
 /**
  * Gelen token ile e-posta adresini doğrular.
@@ -55,7 +55,8 @@ const resendVerificationEmail = async (req, res) => {
     }
 
     const verificationToken = generateEmailVerificationToken(user.id, user.email);
-    const verificationLink = `${APP_BASE_URL}/verify-email.html?token=${verificationToken}`;
+    // DÜZELTME: Linkten ".html" uzantısı kaldırıldı ve doğru URL kullanıldı.
+    const verificationLink = `${CLIENT_URL}/verify-email?token=${verificationToken}`;
     await sendAccountActivationEmail(user.email, user.nickname || user.username, verificationLink);
     
     return Response.ok(res, 'Yeni doğrulama e-postası gönderildi.');
