@@ -19,10 +19,9 @@ const successResponse = (res, statusCode, message, data = null, meta = null) => 
   if (meta !== null) {
     responsePayload.meta = meta;
   }
-  // JSON.stringify'a replacer fonksiyonunu ekle
   const jsonResponse = JSON.stringify(responsePayload, replacer);
-  res.setHeader('Content-Type', 'application/json'); // Content-Type'ı ayarla
-  return res.status(statusCode).send(jsonResponse); // .send() ile gönder
+  res.setHeader('Content-Type', 'application/json');
+  return res.status(statusCode).send(jsonResponse);
 };
 
 const errorResponse = (res, statusCode, message, errors = null) => {
@@ -33,13 +32,10 @@ const errorResponse = (res, statusCode, message, errors = null) => {
   if (errors !== null) {
     responsePayload.hatalar = errors;
   }
-  // JSON.stringify'a replacer fonksiyonunu ekle
   const jsonResponse = JSON.stringify(responsePayload, replacer);
-  res.setHeader('Content-Type', 'application/json'); // Content-Type'ı ayarla
-  return res.status(statusCode).send(jsonResponse); // .send() ile gönder
+  res.setHeader('Content-Type', 'application/json');
+  return res.status(statusCode).send(jsonResponse);
 };
-
-// ... (ok, created, badRequest vb. yardımcı fonksiyonlar aynı kalır, çünkü onlar da successResponse ve errorResponse'u çağırıyor)
 
 // Başarı durumları için yardımcı fonksiyonlar
 const ok = (res, message, data, meta) => successResponse(res, 200, message, data, meta);
@@ -58,6 +54,7 @@ const conflict = (res, message, errors) => errorResponse(res, 409, message || '�
 const unprocessableEntity = (res, message, errors) => errorResponse(res, 422, message || 'İşlenemeyen varlık. Gönderilen veri doğrulanamadı.', errors);
 const tooManyRequests = (res, message) => errorResponse(res, 429, message || 'Çok fazla istek. Lütfen daha sonra tekrar deneyin.');
 const internalServerError = (res, message, errors) => errorResponse(res, 500, message || 'Sunucu hatası. Beklenmedik bir sorun oluştu.', errors);
+const notImplemented = (res, message) => errorResponse(res, 501, message || 'Bu özellik henüz implemente edilmedi.'); // <-- EKLENEN FONKSİYON
 const serviceUnavailable = (res, message) => errorResponse(res, 503, message || 'Servis kullanılamıyor. Lütfen daha sonra tekrar deneyin.');
 
 module.exports = {
@@ -75,5 +72,6 @@ module.exports = {
   unprocessableEntity,
   tooManyRequests,
   internalServerError,
+  notImplemented, // <-- EXPORT'A EKLE
   serviceUnavailable,
 };

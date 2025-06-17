@@ -2,6 +2,7 @@
 const { PrismaClient, UserRole, Prisma } = require('../../generated/prisma');
 const prisma = new PrismaClient();
 const Response = require('../../utils/responseHandler');
+const { generateRtcToken, agoraAppId } = require('../../services/agora_service.js');
 
 const STREAM_STATUS = { LIVE: 'LIVE', SCHEDULED: 'SCHEDULED', ENDED: 'ENDED', CANCELLED: 'CANCELLED' };
 
@@ -17,6 +18,7 @@ const sanitizeStreamResponse = (stream) => {
 
 exports.createOrUpdateStream = async (req, res) => {
     const broadcasterId = req.user.userId;
+    // Multer, metin alanlarını req.body'ye, dosyayı req.file'a koyar.
     const { title, status, startTime } = req.body;
 
     try {
@@ -29,17 +31,41 @@ exports.createOrUpdateStream = async (req, res) => {
             }
         }
 
+        // YENİ EKLENEN KISIM: Yüklenen dosyanın URL'ini al
+        let coverImageUrl = null;
+        if (req.file) {
+            // Dosyanın public URL'ini oluştur
+            coverImageUrl = `/images/streams/${req.file.filename}`;
+        }
+        // --- BİTİŞ ---
+
         const newStreamData = {
             broadcasterId,
             title: title || "Canlı Yayın Odası",
             status: status || STREAM_STATUS.LIVE,
             startTime: (status === STREAM_STATUS.SCHEDULED && startTime) ? new Date(startTime) : new Date(),
+            coverImageUrl: coverImageUrl, // Veritabanına kaydetmek için ekle
         };
 
         const stream = await prisma.stream.create({ data: newStreamData });
         
-        // TODO: Takipçilere bildirim gönder
-        return Response.created(res, `Yayın başarıyla '${stream.status}' olarak ayarlandı.`, { yayin: sanitizeStreamResponse(stream) });
+        let agoraToken = null;
+        if (stream.status === STREAM_STATUS.LIVE) {
+            const channelName = stream.id; 
+            agoraToken = generateRtcToken(channelName, broadcasterId); 
+            if (!agoraToken) {
+                console.warn(`Yayın (ID: ${stream.id}) için Agora token üretilemedi.`);
+            }
+        }
+
+        return Response.created(res, `Yayın başarıyla '${stream.status}' olarak ayarlandı.`, { 
+            yayin: sanitizeStreamResponse(stream),
+            agora: {
+                token: agoraToken,
+                appId: agoraAppId,
+                channelName: stream.id
+            }
+        });
     } catch (error) {
         console.error("Yayın oluşturma/güncelleme hatası:", error);
         return Response.internalServerError(res, "Yayın başlatılırken/planlanırken bir hata oluştu.");
@@ -49,7 +75,7 @@ exports.createOrUpdateStream = async (req, res) => {
 exports.updateStreamDetails = async (req, res) => {
     const { streamId } = req.params;
     const broadcasterId = req.user.userId;
-    const { title, coverImageUrl, tags } = req.body;
+    const { title, coverImageUrl, tags } = req.body; // Not: Bu endpoint hala JSON kabul ediyor, dosya değil.
 
     try {
         const stream = await prisma.stream.findUnique({ where: { id: streamId } });
@@ -67,7 +93,6 @@ exports.updateStreamDetails = async (req, res) => {
             data: dataToUpdate
         });
 
-        // TODO: WebSocket ile izleyicilere güncelleme bildir
         return Response.ok(res, "Yayın detayları güncellendi.", { yayin: sanitizeStreamResponse(updatedStream) });
     } catch (error) {
         console.error("Yayın detayları güncelleme hatası:", error);
@@ -97,7 +122,6 @@ exports.endStream = async (req, res) => {
             }
         });
         
-        // TODO: WebSocket ile izleyicilere yayının bittiğini bildir
         return Response.ok(res, "Yayın başarıyla sonlandırıldı.", { yayin: sanitizeStreamResponse(endedStream) });
     } catch (error) {
         console.error("Yayın sonlandırma hatası:", error);

@@ -32,7 +32,10 @@ exports.updatePassword = async (req, res) => {
         const hashedNewPassword = await bcrypt.hash(newPassword, 12);
         await prisma.user.update({
             where: { id: userId },
-            data: { password: hashedNewPassword },
+            data: {
+                password: hashedNewPassword,
+                passwordChangedAt: new Date() // <-- YENİ EKLENEN ALAN: Şifre değiştirme zamanını güncelle
+            },
         });
 
         await prisma.refreshToken.deleteMany({ where: { userId: userId } });
@@ -63,7 +66,6 @@ exports.requestEmailChange = async (req, res) => {
 
         const tokenPayload = { userId, newEmail, type: 'email_change_verification' };
         const verificationToken = jwt.sign(tokenPayload, EMAIL_CHANGE_SECRET, { expiresIn: EMAIL_CHANGE_EXPIRES_IN });
-        // DÜZELTME: Link artık Next.js uygulamasını işaret ediyor.
         const verificationLink = `${CLIENT_URL}/verify-email-change?token=${verificationToken}`;
         await sendEmail(newEmail, 'E-posta Adresi Değişikliği Doğrulaması', `<p>Bu değişikliği onaylamak için linke tıklayın: <a href="${verificationLink}">Doğrula</a></p>`);
 

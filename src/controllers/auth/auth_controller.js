@@ -1,12 +1,18 @@
-// src/controllers/auth/auth.controller.js
+// src/controllers/auth/auth_controller.js
 
 const bcrypt = require('bcryptjs');
 const speakeasy = require('speakeasy');
+const jwt = require('jsonwebtoken'); // <-- jwt'yi import edelim
 const { PrismaClient, UserRole } = require('../../generated/prisma');
 const prisma = new PrismaClient();
 const Response = require('../../utils/responseHandler');
 const { sanitizeUser, generateTokens } = require('./utils');
-const { REFRESH_TOKEN_COOKIE_NAME, GLOBAL_COOKIE_PATH, ACCESS_TOKEN_COOKIE_NAME } = require('./constants');
+const { 
+  REFRESH_TOKEN_COOKIE_NAME, 
+  JWT_REFRESH_SECRET, 
+  GLOBAL_COOKIE_PATH, 
+  ACCESS_TOKEN_COOKIE_NAME 
+} = require('./constants');
 
 /**
  * Kullanıcı giriş işlemi ve 2FA kontrolü.
@@ -32,7 +38,6 @@ const login = async (req, res) => {
       return Response.forbidden(res, `Hesabınızın durumu: ${user.accountStatus}. Giriş yapamazsınız.`);
     }
 
-    // 2FA Logic
     if (user.twoFactorEnabled && user.twoFactorSecret) {
       if (twoFactorToken) {
         const verified = speakeasy.totp.verify({
@@ -42,16 +47,13 @@ const login = async (req, res) => {
           window: 1,
         });
         if (!verified) return Response.unauthorized(res, 'Girilen 2FA kodu geçersiz.');
-        // 2FA success, proceed to generate tokens
       } else if (backupCode) {
-        // Backup code logic... (omitted for brevity, but can be added here)
         return Response.notImplemented(res, "Backup code logic not fully implemented yet.");
       } else {
         return Response.ok(res, 'Şifre doğrulandı. Lütfen 2FA kodunuzu girin.', { twoFactorRequired: true, userId: user.id });
       }
     }
 
-    // Normal Login
     const tokenData = await generateTokens(user, res);
     return Response.ok(res, 'Giriş başarılı.', {
       tokenlar: tokenData,
@@ -71,10 +73,43 @@ const login = async (req, res) => {
 const refreshToken = async (req, res) => {
   const providedRefreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
   if (!providedRefreshToken) {
-    return Response.unauthorized(res, 'Oturum bulunamadı.');
+    return Response.unauthorized(res, 'Oturum bulunamadı. Lütfen tekrar giriş yapın.');
   }
-  // Token validation logic... (omitted for brevity, can be added from original code)
-  return Response.notImplemented(res, "Refresh token logic not fully implemented yet.");
+
+  try {
+    // 1. Refresh token'ı doğrula
+    const decoded = jwt.verify(providedRefreshToken, JWT_REFRESH_SECRET);
+
+    // 2. Token'ın veritabanında olup olmadığını kontrol et
+    const dbToken = await prisma.refreshToken.findUnique({
+      where: { token: providedRefreshToken },
+    });
+    if (!dbToken || dbToken.userId !== decoded.userId) {
+      throw new Error('Geçersiz refresh token');
+    }
+
+    // 3. Kullanıcıyı bul
+    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
+    if (!user) {
+      throw new Error('Kullanıcı bulunamadı');
+    }
+
+    // 4. Yeni token'lar oluştur (generateTokens hem access hem refresh üretir ve eskisini silip yenisini DB'ye kaydeder)
+    const tokenData = await generateTokens(user, res);
+    
+    // 5. Sadece yeni access token ve kullanıcı bilgisiyle yanıt dön
+    return Response.ok(res, 'Oturum başarıyla yenilendi.', {
+      accessToken: tokenData.accessToken,
+      kullanici: sanitizeUser(user),
+    });
+
+  } catch (error) {
+    console.error('Refresh token hatası:', error.message);
+    // Güvenlik için hatalı denemelerde cookie'leri temizle
+    res.clearCookie(ACCESS_TOKEN_COOKIE_NAME, { path: GLOBAL_COOKIE_PATH });
+    res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, { path: GLOBAL_COOKIE_PATH });
+    return Response.unauthorized(res, 'Oturumunuz geçersiz veya süresi dolmuş. Lütfen tekrar giriş yapın.');
+  }
 };
 
 /**

@@ -2,6 +2,7 @@
 const { PrismaClient } = require('../../generated/prisma');
 const prisma = new PrismaClient();
 const Response = require('../../utils/responseHandler');
+const { generateRtcToken, agoraAppId } = require('../../services/agora_service');
 
 const STREAM_STATUS = { LIVE: 'LIVE' };
 
@@ -16,6 +17,48 @@ if (process.env.TURN_URLS) {
     });
 }
 
+/**
+ * YENİ FONKSİYON: İzleyici için Agora Token üretir.
+ */
+exports.getViewerToken = async (req, res) => {
+    const { streamId } = req.params;
+    const { userId } = req.user; // authenticateToken middleware'inden gelen kullanıcı ID'si
+
+    try {
+        // 1. Yayının var olup olmadığını ve canlı (LIVE) olup olmadığını kontrol et
+        const stream = await prisma.stream.findFirst({
+            where: {
+                id: streamId,
+                status: STREAM_STATUS.LIVE,
+            },
+        });
+
+        if (!stream) {
+            return Response.notFound(res, "Belirtilen ID ile eşleşen aktif bir yayın bulunamadı.");
+        }
+
+        // 2. Agora servisini kullanarak token üret
+        const token = generateRtcToken(streamId, userId);
+
+        if (!token) {
+            return Response.internalServerError(res, "Agora token üretilirken bir sunucu hatası oluştu. Lütfen yöneticinizle iletişime geçin.");
+        }
+
+        // 3. İstenen formatta başarılı yanıtı gönder
+        return Response.ok(res, "Agora token başarıyla oluşturuldu.", {
+            agora: {
+                token: token,
+                appId: agoraAppId,
+                channelName: streamId
+            }
+        });
+
+    } catch (error) {
+        console.error(`İzleyici token'ı oluşturma hatası (Stream ID: ${streamId}):`, error);
+        return Response.internalServerError(res, "Token oluşturulurken beklenmedik bir hata oluştu.");
+    }
+};
+
 exports.getIceServers = (req, res) => {
     return Response.ok(res, "ICE sunucu bilgileri alındı.", { iceServers: ICE_SERVERS });
 };
@@ -25,7 +68,6 @@ exports.getIceServers = (req, res) => {
 exports.viewerJoined = async (req, res) => {
     const { streamId } = req.params;
     try {
-        // Yayının varlığını kontrol et.
         const stream = await prisma.stream.findUnique({ where: { id: streamId }, select: { id: true } });
         if (!stream) return Response.notFound(res, "Yayın bulunamadı.");
         

@@ -147,6 +147,7 @@ model User {
   diamonds                BigInt    @default(0)
   email                   String    @unique
   password                String?   // E-posta/şifre ile giriş için
+  passwordChangedAt       DateTime?
   isEmailVerified         Boolean   @default(false)
   lastLoginAt             DateTime?
   followingCount          Int       @default(0)

@@ -118,9 +118,44 @@ const deleteChatRoom = async (req, res) => {
     }
 };
 
+const uploadCoverImage = async (req, res) => {
+    const { roomId } = req.params;
+    const requesterId = req.user.userId;
+    const userRole = req.user.role;
+
+    try {
+        if (!req.file) {
+            return Response.badRequest(res, "Yüklenecek bir kapak fotoğrafı dosyası bulunamadı. Lütfen 'coverImage' alanını kontrol edin.");
+        }
+
+        if (!await canUserManageRoom(requesterId, userRole, roomId)) {
+            return Response.forbidden(res, 'Bu odanın kapak fotoğrafını güncelleme yetkiniz yok.');
+        }
+
+        // Dosyanın sunucudaki public URL'ini oluştur
+        // Örn: /images/chatroom/coverImage-1678886400000-123456789.jpg
+        const imageUrl = `/images/chatroom/${req.file.filename}`;
+
+        // Veritabanında ChatRoom kaydını güncelle
+        const updatedRoom = await prisma.chatRoom.update({
+            where: { id: roomId },
+            data: {
+                coverImageUrl: imageUrl
+            }
+        });
+
+        return Response.ok(res, 'Oda kapak fotoğrafı başarıyla güncellendi.', { oda: updatedRoom });
+
+    } catch (error) {
+        console.error(`Oda kapak fotoğrafı yükleme hatası (ID: ${roomId}):`, error);
+        return Response.internalServerError(res, 'Kapak fotoğrafı yüklenirken bir hata oluştu.');
+    }
+};
+
 module.exports = {
     createChatRoom,
     getChatRoomById,
     updateChatRoom,
     deleteChatRoom,
+    uploadCoverImage,
 };

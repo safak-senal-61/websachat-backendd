@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 const Response = require('../../utils/responseHandler');
 const { sendPasswordResetEmail } = require('../../utils/mailer');
 const { generatePasswordResetToken } = require('./utils');
-const { PASSWORD_RESET_SECRET, CLIENT_URL } = require('./constants'); // APP_BASE_URL -> CLIENT_URL
+const { PASSWORD_RESET_SECRET, CLIENT_URL } = require('./constants');
 
 /**
  * Şifre sıfırlama talebi oluşturur ve e-posta gönderir.
@@ -20,7 +20,6 @@ const forgotPassword = async (req, res) => {
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     if (user) {
       const resetToken = generatePasswordResetToken(user.id, user.email);
-      // DÜZELTME: Link artık Next.js uygulamanızı işaret ediyor.
       const resetLink = `${CLIENT_URL}/reset-password?token=${resetToken}`;
       await sendPasswordResetEmail(user.email, user.nickname || user.username, resetLink);
     }
@@ -41,6 +40,13 @@ const validatePasswordResetToken = async (req, res) => {
   try {
     const decoded = jwt.verify(token, PASSWORD_RESET_SECRET);
     if (decoded.type !== 'password_reset') return Response.badRequest(res, 'Geçersiz token tipi.');
+    
+    // YENİ KONTROL: Token oluşturulduktan sonra şifre değiştirilmiş mi?
+    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
+    if (user && user.passwordChangedAt && (decoded.iat * 1000) < user.passwordChangedAt.getTime()) {
+      return Response.unauthorized(res, 'Bu şifre sıfırlama linki zaten kullanılmış veya geçersiz kılınmıştır.');
+    }
+
     return Response.ok(res, 'Şifre sıfırlama token\'ı geçerli.');
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) return Response.unauthorized(res, 'Token süresi dolmuş.');
@@ -67,10 +73,19 @@ const resetPassword = async (req, res) => {
     const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
     if (!user) return Response.notFound(res, 'Kullanıcı bulunamadı.');
 
+    // YENİ EKLENEN KONTROL: Token, son şifre değişikliğinden önce mi oluşturulmuş?
+    // Bu, linkin tekrar kullanılmasını engeller.
+    if (user.passwordChangedAt && (decoded.iat * 1000) < user.passwordChangedAt.getTime()) {
+      return Response.unauthorized(res, 'Bu şifre sıfırlama linki zaten kullanılmış veya geçersiz kılınmıştır.');
+    }
+
     const hashedPassword = await bcrypt.hash(password, 12);
     await prisma.user.update({
       where: { id: user.id },
-      data: { password: hashedPassword },
+      data: {
+        password: hashedPassword,
+        passwordChangedAt: new Date() // <-- YENİ EKLENEN ALAN: Şifre değiştirme zamanını güncelle
+      },
     });
     
     // Güvenlik için tüm refresh token'larını sil
