@@ -1,7 +1,14 @@
 // src/controllers/transaction/user_actions_controller.js
-const { PrismaClient, TransactionType, Currency, TransactionStatus } = require('../../generated/prisma');
+const { PrismaClient, TransactionType, TransactionStatus } = require('../../generated/prisma');
 const prisma = new PrismaClient();
 const Response = require('../../utils/responseHandler');
+
+// Currency enum'u Prisma tarafından generate edilmediği için manuel olarak tanımlandı.
+const Currency = {
+    USD: 'USD',
+    DIAMOND: 'DIAMOND',
+    COIN: 'COIN'
+};
 
 exports.getUserTransactions = async (req, res) => {
     const userId = req.user.userId;

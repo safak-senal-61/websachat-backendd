@@ -1,7 +1,14 @@
 // src/controllers/gift/gift_sending_controller.js
-const { PrismaClient, TransactionType, Currency, TransactionStatus } = require('../../generated/prisma');
+const { PrismaClient, TransactionType, TransactionStatus } = require('../../generated/prisma');
 const prisma = new PrismaClient();
 const Response = require('../../utils/responseHandler');
+
+// Currency enum'u Prisma tarafından generate edilmediği için manuel olarak tanımlandı.
+const Currency = {
+    USD: 'USD',
+    DIAMOND: 'DIAMOND',
+    COIN: 'COIN'
+};
 
 exports.sendGift = async (req, res) => {
     const { giftModelId } = req.params;
@@ -45,7 +52,7 @@ exports.sendGift = async (req, res) => {
                     status: TransactionStatus.COMPLETED
                 }
             });
-            
+
             // 3. Eğer alıcı varsa, elmaslarını artır ve işlem kaydı oluştur
             if (targetUserId) {
                 await tx.user.update({
@@ -80,7 +87,7 @@ exports.sendGift = async (req, res) => {
             });
             return newMessage;
         });
-        
+
         // TODO: WebSocket bildirimi
         return Response.created(res, "Hediye başarıyla gönderildi.", { gonderilenMesaj: result });
 

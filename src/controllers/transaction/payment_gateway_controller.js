@@ -1,8 +1,15 @@
 // src/controllers/transaction/payment_gateway_controller.js
-const { PrismaClient, TransactionType, Currency, TransactionStatus } = require('../../generated/prisma');
+const { PrismaClient, TransactionType, TransactionStatus } = require('../../generated/prisma');
 const prisma = new PrismaClient();
 const Response = require('../../utils/responseHandler');
 // const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
+// Currency enum'u Prisma tarafından generate edilmediği için manuel olarak tanımlandı.
+const Currency = {
+    USD: 'USD',
+    DIAMOND: 'DIAMOND',
+    COIN: 'COIN'
+};
 
 exports.initiateCoinPurchase = async (req, res) => {
     const { amount, currency = Currency.USD, coinPackageId } = req.body;
@@ -42,7 +49,7 @@ exports.handlePaymentWebhook = async (req, res) => {
     // Bu endpoint, Stripe gibi ödeme sağlayıcılardan gelen webhook'ları dinler.
     // Gelen isteğin doğrulanması ve işlenmesi kritik öneme sahiptir.
     // Bu, sadece bir konsepttir ve üretim için güvenli hale getirilmelidir.
-    
+
     // const event = req.body;
     // switch (event.type) {
     //     case 'payment_intent.succeeded':
@@ -51,7 +58,7 @@ exports.handlePaymentWebhook = async (req, res) => {
     //     case 'payment_intent.payment_failed':
     //         // İşlemi 'FAILED' yap.
     //         break;
-    // }
+// }
 
     console.warn("handlePaymentWebhook endpoint'i çağrıldı ancak tam olarak implemente edilmedi.");
     return Response.ok(res, "Webhook alındı.");
