@@ -1,29 +1,59 @@
 // src/controllers/transaction/admin_actions_controller.js
-const { PrismaClient, TransactionStatus, TransactionType, Currency } = require('../../generated/prisma');
+const { PrismaClient, TransactionStatus, TransactionType } = require('../../generated/prisma');
 const prisma = new PrismaClient();
 const Response = require('../../utils/responseHandler');
+
+// Currency enum'u Prisma tarafından generate edilmediği için manuel olarak tanımlandı.
+const Currency = {
+    USD: 'USD',
+    DIAMOND: 'DIAMOND',
+    COIN: 'COIN'
+};
+
 
 // EKSİK OLAN FONKSİYON EKLENDİ
 exports.createTransactionRecord = async (req, res, next) => {
     // Bu fonksiyon genellikle admin paneli veya test amaçlı manuel işlem oluşturmak için kullanılır.
-    const { userId, transactionType, amount, currency, description } = req.body;
+    const { userId, transactionType, amount, currency, description, status } = req.body;
 
     if (!userId || !transactionType || amount === undefined || !currency) {
         return Response.badRequest(res, "userId, transactionType, amount, ve currency alanları zorunludur.");
     }
+    const numericAmount = parseFloat(amount);
 
     try {
-        const newTransaction = await prisma.transaction.create({
-            data: {
-                userId,
-                transactionType,
-                amount: parseFloat(amount),
-                currency,
-                description: description || 'Manuel olarak oluşturulan işlem',
-                status: TransactionStatus.COMPLETED,
+        // --- YENİ EKLENEN KISIM: Transaction içinde bakiye güncelleme ---
+        const result = await prisma.$transaction(async (tx) => {
+            const newTransaction = await tx.transaction.create({
+                data: {
+                    userId,
+                    transactionType,
+                    amount: numericAmount,
+                    currency,
+                    description: description || 'Manuel olarak oluşturulan işlem',
+                    status: status || TransactionStatus.COMPLETED,
+                }
+            });
+
+            // Eğer işlem "COIN_PURCHASE" ve "COMPLETED" ise, kullanıcının jetonunu ekle
+            if (transactionType === TransactionType.COIN_PURCHASE && newTransaction.status === TransactionStatus.COMPLETED) {
+                await tx.user.update({
+                    where: { id: userId },
+                    data: {
+                        coins: {
+                            increment: BigInt(Math.floor(numericAmount)) // Jetonlar genellikle tamsayıdır.
+                        }
+                    }
+                });
             }
+            // Başka işlem türleri için de benzer mantıklar eklenebilir.
+
+            return newTransaction;
         });
-        return Response.created(res, "İşlem başarıyla oluşturuldu.", { islem: newTransaction });
+        // --- DEĞİŞİKLİK SONU ---
+
+        return Response.created(res, "İşlem başarıyla oluşturuldu ve bakiye güncellendi.", { islem: result });
+
     } catch (error) {
         console.error("Manuel işlem oluşturma hatası:", error);
         return Response.internalServerError(res, "İşlem oluşturulurken bir hata oluştu.");

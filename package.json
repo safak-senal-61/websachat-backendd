@@ -39,6 +39,7 @@
     "express-validator": "^7.2.1",
     "glob": "^9.3.5",
     "helmet": "^7.0.0",
+    "iyzipay": "^2.0.64",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "multer": "^2.0.0",
