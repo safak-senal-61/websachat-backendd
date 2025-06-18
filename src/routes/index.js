@@ -21,6 +21,8 @@ const userSettingsRouter = require('./userSettings');
 const agoraRouter = require('./agora');
 const userRouter = require('./user_routes.js'); // Yeni eklenen kullanıcı rotaları
 const streamRouter = require('./stream');
+const transactionRouter = require('./transaction');
+
 console.log('✅ Tüm rota modülleri ana birleştiriciye yükleniyor...');
 
 // Her modülü kendi ana yolu (prefix) ile kullanıma al
@@ -39,6 +41,8 @@ router.use('/settings', userSettingsRouter);
 router.use('/agora', agoraRouter);
 router.use('/users', userRouter); // /users yolunu yeni router'a bağla
 router.use('/streams', streamRouter);
+router.use('/transactions', transactionRouter);
+
 console.log('✅ Ana rota yapılandırması tamamlandı.');
 
 module.exports = router;
