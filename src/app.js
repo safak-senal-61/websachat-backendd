@@ -27,6 +27,8 @@ const allowedOrigins = [
     'https://websachat-web-610000.web.app',
     'http://localhost:3000',
     'http://localhost:3001',
+    'https://d033c711-5834-4f77-868a-94ae778c35f1-00-33t75erjtazez.janeway.replit.dev',
+    'https://sandbox-api.iyzipay.com',
     'https://3000-firebase-websachat-web-1748782524865.cluster-3gc7bglotjgwuxlqpiut7yyqt4.cloudworkstations.dev',
 ];
 
