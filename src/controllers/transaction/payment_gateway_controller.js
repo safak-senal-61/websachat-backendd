@@ -13,16 +13,19 @@ const Currency = {
     COIN: 'COIN'
 };
 
-// Bu verilerin veritabanında bir "CoinPackages" tablosunda tutulması en iyisidir.
 const coinPackages = {
-    'PKG100': { id: 'PKG100', name: 'Başlangıç Paketi', price: '10.00', coins: 1000, bonusCoins: 50 },
-    'PKG500': { id: 'PKG500', name: 'Fenomen Paketi', price: '45.00', coins: 5500, bonusCoins: 500 },
-    'PKG1000': { id: 'PKG1000', name: 'Kral Paketi', price: '80.00', coins: 12000, bonusCoins: 2000 },
-    'PKG5000': { id: 'PKG5000', name: 'İmparator Paketi', price: '500.00', coins: 65000, bonusCoins: 15000 },
+    'PKG15': { id: 'PKG15', name: 'Deneme Paketi', price: '15.00', coins: 50, bonusCoins: 5 },
+    'PKG25': { id: 'PKG25', name: 'Başlangıç Paketi', price: '25.00', coins: 100, bonusCoins: 10 },
+    'PKG50': { id: 'PKG50', name: 'Popüler Paket', price: '50.00', coins: 250, bonusCoins: 50 },
+    'PKG95': { id: 'PKG95', name: 'Fenomen Paketi', price: '95.00', coins: 500, bonusCoins: 100 },
+    'PKG180': { id: 'PKG180', name: 'VIP Paketi', price: '180.00', coins: 1000, bonusCoins: 250 },
+    'PKG400': { id: 'PKG400', name: 'Premium Paket', price: '400.00', coins: 2500, bonusCoins: 750 },
+    'PKG750': { id: 'PKG750', name: 'Elite Paketi', price: '750.00', coins: 5000, bonusCoins: 2000 },
+    'PKG1400': { id: 'PKG1400', name: 'İmparator Paketi', price: '1400.00', coins: 10000, bonusCoins: 5000 },
 };
 
 /**
- * Iyzico ödeme formunu başlatır.
+ * Iyzico ödeme formunu başlatır ve Iyzico'dan dönen token'ı DB'ye kaydeder.
  */
 exports.initiateCoinPurchase = async (req, res) => {
     const { coinPackageId } = req.body;
@@ -35,9 +38,7 @@ exports.initiateCoinPurchase = async (req, res) => {
 
     try {
         const user = await prisma.user.findUnique({ where: { id: userId } });
-        if (!user) {
-            return Response.notFound(res, "Kullanıcı bulunamadı.");
-        }
+        if (!user) return Response.notFound(res, "Kullanıcı bulunamadı.");
 
         const pendingTransaction = await prisma.transaction.create({
             data: {
@@ -61,50 +62,31 @@ exports.initiateCoinPurchase = async (req, res) => {
             basketId: pendingTransaction.id,
             paymentGroup: Iyzipay.PAYMENT_GROUP.PRODUCT,
             callbackUrl: `${process.env.BASE_URL}/transactions/callback/iyzico`,
-            buyer: {
-                id: user.id,
-                name: user.nickname || user.username,
-                surname: 'User',
-                gsmNumber: '+905555555555',
-                email: user.email,
-                identityNumber: '11111111111',
-                lastLoginDate: user.lastLoginAt ? new Date(user.lastLoginAt).toISOString().replace(/T/, ' ').replace(/\..+/, '') : new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''),
-                registrationDate: new Date(user.createdAt).toISOString().replace(/T/, ' ').replace(/\..+/, ''),
-                registrationAddress: 'N/A',
-                ip: req.ip,
-                city: 'N/A',
-                country: user.country || 'Turkey',
-                zipCode: '34000',
-            },
-            shippingAddress: {
-                contactName: user.nickname || user.username,
-                city: 'N/A',
-                country: 'Turkey',
-                address: 'N/A',
-                zipCode: '34000',
-            },
-            billingAddress: {
-                contactName: user.nickname || user.username,
-                city: 'N/A',
-                country: 'Turkey',
-                address: 'N/A',
-                zipCode: '34000',
-            },
-            basketItems: [{
-                id: selectedPackage.id,
-                name: selectedPackage.name,
-                category1: 'Digital Goods',
-                itemType: Iyzipay.BASKET_ITEM_TYPE.VIRTUAL,
-                price: selectedPackage.price,
-            }]
+            buyer: { id: user.id, name: user.nickname || user.username, surname: 'User', gsmNumber: '+905555555555', email: user.email, identityNumber: '11111111111', lastLoginDate: new Date(user.lastLoginAt || Date.now()).toISOString().replace(/T/, ' ').replace(/\..+/, ''), registrationDate: new Date(user.createdAt).toISOString().replace(/T/, ' ').replace(/\..+/, ''), registrationAddress: 'N/A', ip: req.ip, city: 'N/A', country: user.country || 'Turkey', zipCode: '34000' },
+            shippingAddress: { contactName: user.nickname || user.username, city: 'N/A', country: 'Turkey', address: 'N/A', zipCode: '34000' },
+            billingAddress: { contactName: user.nickname || user.username, city: 'N/A', country: 'Turkey', address: 'N/A', zipCode: '34000' },
+            basketItems: [{ id: selectedPackage.id, name: selectedPackage.name, category1: 'Digital Goods', itemType: Iyzipay.BASKET_ITEM_TYPE.VIRTUAL, price: selectedPackage.price }]
         };
 
-        iyzico.checkoutFormInitialize.create(request, (err, result) => {
+        iyzico.checkoutFormInitialize.create(request, async (err, result) => {
             if (err) {
                 console.error("Iyzico ödeme formu oluşturma hatası:", err);
                 return Response.internalServerError(res, "Ödeme formu oluşturulamadı.", err);
             }
-            if (result.status === 'success') {
+            if (result.status === 'success' && result.token) {
+                // ================== GÜNCELLEME 1: IYZICO TOKEN'INI DB'YE KAYDET ==================
+                try {
+                    await prisma.transaction.update({
+                        where: { id: pendingTransaction.id },
+                        data: { paymentGatewayToken: result.token }
+                    });
+                    console.log(`[iyzico] Iyzico token (${result.token}) Transaction (${pendingTransaction.id}) kaydına eklendi.`);
+                } catch (dbError) {
+                    console.error("Iyzico token'ı veritabanına kaydederken hata:", dbError);
+                    return Response.internalServerError(res, "Ödeme oturumu başlatılamadı.");
+                }
+                // ================== GÜNCELLEME SONU ==================
+
                 return Response.ok(res, "Ödeme formu başarıyla oluşturuldu.", {
                     paymentPageContent: result.checkoutFormContent
                 });
@@ -114,7 +96,6 @@ exports.initiateCoinPurchase = async (req, res) => {
                 });
             }
         });
-
     } catch (error) {
         console.error("Jeton satın alma başlatma hatası:", error);
         return Response.internalServerError(res, "Satın alma işlemi başlatılırken hata oluştu.");
@@ -125,26 +106,29 @@ exports.initiateCoinPurchase = async (req, res) => {
  * Iyzico'dan gelen callback'i işler, ödemeyi doğrular ve işlemi tamamlar.
  */
 exports.handleIyzicoCallback = async (req, res) => {
-    // --- DEBUG İÇİN EKLENEN LOG'LAR ---
-    // Sorunu anlamak için Iyzico'dan gelen isteğin içeriğini loglayalım.
     console.log("--- IYZICO CALLBACK ALINDI ---");
     console.log("Request Body:", req.body);
-    console.log("Request Query:", req.query);
-    // --- DEBUG SONU ---
 
-    // --- GÜNCELLENMİŞ KOD ---
-    // Token ve conversationId'yi hem body'den hem de query'den almayı dene.
-    // Iyzico'nun veriyi hangi yöntemle gönderdiğinden emin olmak için en güvenli yoldur.
-    const token = req.body.token || req.query.token;
-    const conversationId = req.body.conversationId || req.query.conversationId;
-    
-    // --- KONTROL ---
-    if (!token || !conversationId) {
-        console.warn("Iyzico callback'i 'token' veya 'conversationId' olmadan geldi.");
+    const token = req.body.token;
+    if (!token) {
+        console.warn("Iyzico callback'i 'token' olmadan geldi.");
         return res.redirect(`${process.env.CLIENT_URL}/payment/failed?reason=invalid_callback_parameters`);
     }
 
     try {
+        // ================== GÜNCELLEME 2: TOKEN İLE TRANSACTION'I BUL ==================
+        const transaction = await prisma.transaction.findUnique({
+            where: { paymentGatewayToken: token }
+        });
+
+        if (!transaction) {
+            console.error(`Iyzico callback'i için geçersiz token: ${token}. Veritabanında eşleşme bulunamadı.`);
+            return res.redirect(`${process.env.CLIENT_URL}/payment/failed?reason=transaction_not_found`);
+        }
+        
+        const conversationId = transaction.id;
+        // ================== GÜNCELLEME SONU ==================
+
         iyzico.checkoutForm.retrieve({
             locale: Iyzipay.LOCALE.TR,
             conversationId: conversationId,
@@ -158,27 +142,20 @@ exports.handleIyzicoCallback = async (req, res) => {
                 }).catch(e => console.error("Başarısız işlem güncellenirken hata:", e));
                 return res.redirect(`${process.env.CLIENT_URL}/payment/failed?reason=${result.errorCode || 'verification_failed'}`);
             }
-
-            const transactionId = conversationId;
+            
+            if (transaction.status !== TransactionStatus.PENDING) {
+                console.warn(`Bu işlem daha önce işlenmiş olabilir: ${transaction.id}, Durum: ${transaction.status}`);
+                // Kullanıcıyı zaten başarılı olduğuna dair bir sayfaya yönlendirebiliriz.
+                return res.redirect(`${process.env.CLIENT_URL}/payment/success?already_processed=true`);
+            }
 
             try {
                 await prisma.$transaction(async (tx) => {
-                    const transaction = await tx.transaction.findUnique({ where: { id: transactionId } });
-                    if (!transaction) {
-                        throw new Error(`İşlem bulunamadı: ${transactionId}`);
-                    }
-                    if (transaction.status !== TransactionStatus.PENDING) {
-                        console.warn(`Bu işlem daha önce işlenmiş olabilir: ${transactionId}, Durum: ${transaction.status}`);
-                        return;
-                    }
-
                     const selectedPackage = coinPackages[transaction.relatedEntityId];
-                    if (!selectedPackage) {
-                        throw new Error(`Geçersiz paket ID'si: ${transaction.relatedEntityId}`);
-                    }
+                    if (!selectedPackage)  throw new Error(`Geçersiz paket ID'si: ${transaction.relatedEntityId}`);
 
                     await tx.transaction.update({
-                        where: { id: transactionId },
+                        where: { id: transaction.id },
                         data: {
                             status: TransactionStatus.COMPLETED,
                             platformTransactionId: result.paymentId,
@@ -192,11 +169,11 @@ exports.handleIyzicoCallback = async (req, res) => {
                     });
                 });
 
-                console.log(`Iyzico ödemesi başarıyla tamamlandı. Transaction ID: ${transactionId}`);
+                console.log(`Iyzico ödemesi başarıyla tamamlandı. Transaction ID: ${transaction.id}`);
                 return res.redirect(`${process.env.CLIENT_URL}/payment/success`);
 
             } catch (dbError) {
-                console.error(`Iyzico callback DB hatası (Transaction ID: ${transactionId}):`, dbError);
+                console.error(`Iyzico callback DB hatası (Transaction ID: ${transaction.id}):`, dbError);
                 return res.redirect(`${process.env.CLIENT_URL}/payment/failed?reason=database_error`);
             }
         });
@@ -205,7 +182,6 @@ exports.handleIyzicoCallback = async (req, res) => {
         return res.redirect(`${process.env.CLIENT_URL}/payment/failed?reason=internal_error`);
     }
 };
-
 
 exports.handlePaymentWebhook = async (req, res) => {
     console.warn("handlePaymentWebhook endpoint'i çağrıldı ancak bu senaryoda kullanılmıyor.");

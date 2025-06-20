@@ -264,7 +264,7 @@ model Transaction {
   platformTransactionId   String?   @unique
   status                  TransactionStatus @default(PENDING)
   createdAt               DateTime  @default(now())
-
+  paymentGatewayToken     String?  @unique
   @@index([userId])
   @@index([transactionType])
   @@index([status])
