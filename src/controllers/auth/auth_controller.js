@@ -2,7 +2,7 @@
 
 const bcrypt = require('bcryptjs');
 const speakeasy = require('speakeasy');
-const jwt = require('jsonwebtoken'); // <-- jwt'yi import edelim
+const jwt = require('jsonwebtoken');
 const { PrismaClient, UserRole } = require('../../generated/prisma');
 const prisma = new PrismaClient();
 const Response = require('../../utils/responseHandler');
@@ -54,7 +54,8 @@ const login = async (req, res) => {
       }
     }
 
-    const tokenData = await generateTokens(user, res);
+    // `generateTokens` çağrısına `req` eklendi.
+    const tokenData = await generateTokens(user, res, req);
     return Response.ok(res, 'Giriş başarılı.', {
       tokenlar: tokenData,
       kullanici: sanitizeUser(user),
@@ -77,10 +78,8 @@ const refreshToken = async (req, res) => {
   }
 
   try {
-    // 1. Refresh token'ı doğrula
     const decoded = jwt.verify(providedRefreshToken, JWT_REFRESH_SECRET);
 
-    // 2. Token'ın veritabanında olup olmadığını kontrol et
     const dbToken = await prisma.refreshToken.findUnique({
       where: { token: providedRefreshToken },
     });
@@ -88,16 +87,20 @@ const refreshToken = async (req, res) => {
       throw new Error('Geçersiz refresh token');
     }
 
-    // 3. Kullanıcıyı bul
     const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
     if (!user) {
       throw new Error('Kullanıcı bulunamadı');
     }
 
-    // 4. Yeni token'lar oluştur (generateTokens hem access hem refresh üretir ve eskisini silip yenisini DB'ye kaydeder)
-    const tokenData = await generateTokens(user, res);
+    // Oturumun `lastUsedAt` zamanını güncelle
+    await prisma.refreshToken.update({
+        where: { token: providedRefreshToken },
+        data: { lastUsedAt: new Date() }
+    });
+
+    // `generateTokens` çağrısına `req` eklendi.
+    const tokenData = await generateTokens(user, res, req);
     
-    // 5. Sadece yeni access token ve kullanıcı bilgisiyle yanıt dön
     return Response.ok(res, 'Oturum başarıyla yenilendi.', {
       accessToken: tokenData.accessToken,
       kullanici: sanitizeUser(user),
@@ -105,7 +108,6 @@ const refreshToken = async (req, res) => {
 
   } catch (error) {
     console.error('Refresh token hatası:', error.message);
-    // Güvenlik için hatalı denemelerde cookie'leri temizle
     res.clearCookie(ACCESS_TOKEN_COOKIE_NAME, { path: GLOBAL_COOKIE_PATH });
     res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, { path: GLOBAL_COOKIE_PATH });
     return Response.unauthorized(res, 'Oturumunuz geçersiz veya süresi dolmuş. Lütfen tekrar giriş yapın.');
@@ -113,7 +115,7 @@ const refreshToken = async (req, res) => {
 };
 
 /**
- * Kullanıcı çıkış işlemi. Cookie'leri temizler ve DB'den token'ı siler.
+ * Kullanıcı çıkış işlemi.
  */
 const logout = async (req, res) => {
   const providedRefreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
@@ -141,8 +143,76 @@ const logout = async (req, res) => {
   return Response.ok(res, 'Başarıyla çıkış yaptınız.');
 };
 
+/**
+ * Kullanıcının aktif oturumlarını listeler.
+ */
+const getActiveSessions = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const currentRefreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
+
+    const sessions = await prisma.refreshToken.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        ipAddress: true,
+        userAgent: true,
+        lastUsedAt: true,
+        createdAt: true,
+        token: true, // Sadece mevcut token'ı belirlemek için
+      },
+      orderBy: {
+        lastUsedAt: 'desc',
+      },
+    });
+
+    // Token bilgisini client'a göndermeden önce temizle
+    const sanitizedSessions = sessions.map(session => {
+        const isCurrentSession = session.token === currentRefreshToken;
+        // eslint-disable-next-line no-unused-vars
+        const { token, ...rest } = session;
+        return { ...rest, isCurrentSession };
+    });
+
+    return Response.ok(res, 'Aktif oturumlar başarıyla getirildi.', { sessions: sanitizedSessions });
+  } catch (error) {
+    console.error('Oturumları getirirken hata:', error);
+    return Response.internalServerError(res, 'Oturumlar getirilemedi.');
+  }
+};
+
+/**
+ * Mevcut oturum hariç tüm oturumları kapatır.
+ */
+const logoutAllDevices = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const currentRefreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
+
+        if (!currentRefreshToken) {
+            return Response.badRequest(res, "Mevcut oturum bilgisi bulunamadı.");
+        }
+
+        await prisma.refreshToken.deleteMany({
+            where: {
+                userId: userId,
+                NOT: {
+                    token: currentRefreshToken,
+                },
+            },
+        });
+
+        return Response.ok(res, 'Diğer tüm cihazlardaki oturumlar başarıyla sonlandırıldı.');
+    } catch (error) {
+        console.error('Tüm oturumları kapatma hatası:', error);
+        return Response.internalServerError(res, 'Oturumlar kapatılamadı.');
+    }
+};
+
 module.exports = {
   login,
   refreshToken,
   logout,
+  getActiveSessions,
+  logoutAllDevices,
 };

@@ -51,9 +51,10 @@ const sanitizeUser = (user) => {
  * Access ve Refresh token'ları oluşturur, DB'ye kaydeder ve cookie olarak set eder.
  * @param {object} user - Token'ları oluşturulacak kullanıcı nesnesi.
  * @param {object} res - Express response nesnesi.
+ * @param {object} req - Express request nesnesi (IP ve User-Agent almak için).
  * @returns {Promise<object>} accessToken ve süresini içeren nesne.
  */
-const generateTokens = async (user, res) => {
+const generateTokens = async (user, res, req) => {
   const accessTokenPayload = { userId: user.id, username: user.username, email: user.email, role: user.role };
   const accessToken = jwt.sign(accessTokenPayload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
@@ -64,12 +65,18 @@ const generateTokens = async (user, res) => {
   const refreshExpiresInMs = ms(JWT_REFRESH_EXPIRES_IN) || 7 * 24 * 60 * 60 * 1000;
 
   try {
-    await prisma.refreshToken.deleteMany({ where: { userId: user.id } });
+    // Oturum bilgilerini al
+    const ipAddress = req?.ip;
+    const userAgent = req?.headers?.['user-agent']?.slice(0, 255); // User-Agent'ı kısalt
+
+    // Refresh token'ı veritabanına yeni oturum bilgileriyle kaydet
     await prisma.refreshToken.create({
       data: {
         token: refreshToken,
         userId: user.id,
         expiresAt: new Date(Date.now() + refreshExpiresInMs),
+        ipAddress: ipAddress,
+        userAgent: userAgent,
       },
     });
   } catch (dbError) {
